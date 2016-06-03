@@ -165,15 +165,19 @@ public class ReviewboardDiffPart extends AbstractTaskEditorPart {
                 
                 ReviewUi.setActiveReview(new ReviewboardReviewBehaviour(getTaskEditorPage().getTask(), item, diffRevision, getClient(), reviewModelFactory, listener));
                 
-                SCMFileContentsLocator locator = getSCMFileContentsLocator(taskMapper, item.getBase());
-                if ( locator == null ) {
+                SCMFileContentsLocator baseLocator = getSCMFileContentsLocator(taskMapper, item.getBase());
+                if ( baseLocator == null ) {
                     MessageDialog.openWarning(null, "Unable to load base file", "Unable to load base file contents since no plug-in was able to handle the repository " + taskMapper.getRepository());
                     return;
+                }
+                SCMFileContentsLocator targetLocator = getSCMFileContentsLocator(taskMapper, item.getTarget());
+                if ( targetLocator == null ) {
+                    MessageDialog.openWarning(null, "Unable to load target file", "Unable to load target file contents since no plug-in was able to handle the repository " + taskMapper.getRepository() + " The patch from the server will be used instead.");
                 }
                 
                 ReviewboardReviewBehaviour reviewBehaviour = new ReviewboardReviewBehaviour(getTaskEditorPage().getTask() , item, diffRevision, getClient(),reviewModelFactory, listener);
                 
-                CompareUI.openCompareEditor(new ReviewboardCompareEditorInput(item, reviewBehaviour, getTaskData(), locator, diffRevision));
+                CompareUI.openCompareEditor(new ReviewboardCompareEditorInput(item, reviewBehaviour, getTaskData(), baseLocator, targetLocator, diffRevision));
             }
    
         });
