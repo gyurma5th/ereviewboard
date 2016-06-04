@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <feature
-      id="org.review_board.ereviewboard.egit"
+      id="org.review_board.ereviewboard.eclipseccase"
       label="Mylyn Reviews Connector: ReviewBoard Eclipse Clearcase Integration (Optional)"
       version="0.13.3"
       provider-name="eReviewBoard developers"
