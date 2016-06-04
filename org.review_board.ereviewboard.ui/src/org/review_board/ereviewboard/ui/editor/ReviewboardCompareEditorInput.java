@@ -14,8 +14,6 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang.ArrayUtils;
-import org.apache.commons.lang.StringUtils;
 import org.eclipse.compare.CompareConfiguration;
 import org.eclipse.compare.patch.ApplyPatchOperation;
 import org.eclipse.compare.patch.IFilePatch;
@@ -25,7 +23,6 @@ import org.eclipse.core.resources.IStorage;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.Status;
-import org.eclipse.jface.dialogs.ErrorDialog;
 import org.eclipse.mylyn.internal.reviews.ui.compare.FileItemCompareEditorInput;
 import org.eclipse.mylyn.reviews.core.model.IFileItem;
 import org.eclipse.mylyn.tasks.core.data.TaskData;
@@ -49,10 +46,9 @@ import org.review_board.ereviewboard.core.util.ByteArrayStorage;
  */
 @SuppressWarnings("restriction")
 class ReviewboardCompareEditorInput extends FileItemCompareEditorInput {
-
+    
     private final TaskData _taskData;
-    private final SCMFileContentsLocator _baseLocator;
-    private final SCMFileContentsLocator _targetLocator;
+    private final SCMFileContentsLocator _locator;
     private final int _diffRevisionId;
     protected IFileItem _file;
 
@@ -70,8 +66,7 @@ class ReviewboardCompareEditorInput extends FileItemCompareEditorInput {
     ReviewboardCompareEditorInput(IFileItem file, ReviewboardReviewBehaviour reviewBehaviour, TaskData taskData, SCMFileContentsLocator baseLocator, SCMFileContentsLocator targetLocator, int diffRevisionId) {
         super(new CompareConfiguration(), file, reviewBehaviour);
         _taskData = taskData;
-        _baseLocator = baseLocator;
-        _targetLocator = targetLocator;
+        _locator = baseLocator;
         this._diffRevisionId = diffRevisionId;
         this._file=file;
     }
@@ -121,36 +116,9 @@ class ReviewboardCompareEditorInput extends FileItemCompareEditorInput {
             IFilePatchResult result = applyPatch(monitor, patch);
             getFile().getBase().setContent(IOUtils.toString(result.getOriginalContents()));
             getFile().getTarget().setContent(IOUtils.toString(result.getPatchedContents()));
-
-            // if the two contents are the same assume error in patch and use
-            // the revisions directly
-            if (_targetLocator != null && getFile().getBase().getContent().equals(
-                    getFile().getTarget().getContent())) {
-                getFile().getBase().setContent(new String(_baseLocator.getContents(monitor)));
-                getFile().getTarget().setContent(new String(_targetLocator.getContents(monitor)));
-            }
-
-            // remove version from version extended clearcase pathes, so file
-            // type can be deducted from extension
-            getFile().getBase().setPath(normalizePath(getFile().getBase().getPath()));
-            getFile().getTarget().setPath(normalizePath(getFile().getTarget().getPath()));
         }
         
         monitor.worked(1);
-    }
-
-    /**
-     * removes eclipse version info from the path
-     * 
-     * @param path
-     * @return
-     */
-    private String normalizePath(String path) {
-        String[] elements = path.split("@@");
-        if (elements.length == 1) {
-            return path;
-        }
-        return StringUtils.join(ArrayUtils.subarray(elements, 0, elements.length - 1));
     }
 
     private void appendComments(IProgressMonitor monitor, ReviewboardClient client) throws ReviewboardException {
@@ -233,6 +201,6 @@ class ReviewboardCompareEditorInput extends FileItemCompareEditorInput {
 
     private IStorage lookupResource(IProgressMonitor monitor) throws CoreException {
         
-        return new ByteArrayStorage(_baseLocator.getContents(monitor));
+        return new ByteArrayStorage(_locator.getContents(monitor));
     }
 }

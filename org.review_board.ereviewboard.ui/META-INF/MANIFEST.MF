@@ -22,12 +22,12 @@ Require-Bundle: org.eclipse.core.runtime,
  org.apache.commons.io;bundle-version="1.4.0",
  org.eclipse.emf.common,
  org.eclipse.emf.ecore,
- org.apache.commons.lang,
  org.json
 Bundle-ActivationPolicy: lazy
 Bundle-Activator: org.review_board.ereviewboard.ui.ReviewboardUiPlugin
 Bundle-Vendor: %Bundle-Vendor
 Export-Package: org.review_board.ereviewboard.ui,
+ org.review_board.ereviewboard.ui.editor,
  org.review_board.ereviewboard.ui.editor.ext,
  org.review_board.ereviewboard.ui.internal.control;x-internal:=true;x-friends:="org.review_board.ereviewboard.egit.ui,org.review_board.ereviewboard.cvs.ui,org.review_board.ereviewboard.subclipse.ui",
  org.review_board.ereviewboard.ui.util,

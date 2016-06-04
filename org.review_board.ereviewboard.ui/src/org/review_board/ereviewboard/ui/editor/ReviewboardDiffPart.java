@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.eclipse.compare.CompareConfiguration;
+import org.eclipse.compare.CompareEditorInput;
 import org.eclipse.compare.CompareUI;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IConfigurationElement;
@@ -63,6 +64,7 @@ import org.review_board.ereviewboard.core.model.Repository;
 import org.review_board.ereviewboard.core.model.reviews.ReviewModelFactory;
 import org.review_board.ereviewboard.core.model.reviews.TopicAddedListener;
 import org.review_board.ereviewboard.ui.ReviewboardUiPlugin;
+import org.review_board.ereviewboard.ui.editor.ext.ICompareEditorInputFactory;
 import org.review_board.ereviewboard.ui.editor.ext.TaskDiffAction;
 import org.review_board.ereviewboard.ui.util.Labels;
 
@@ -74,14 +76,16 @@ public class ReviewboardDiffPart extends AbstractTaskEditorPart {
 
     private static final String EXTENSION_POINT_TASK_DIFF_ACTIONS = "org.review_board.ereviewboard.ui.taskDiffActions";
     private static final String EXTENSION_POINT_SCM_FILE_CONTENTS_LOCATOR = "org.review_board.ereviewboard.ui.scmFileContentsLocator";
+    protected static final String EXTENSION_POINT_EDITOR_INPUT = "org.review_board.ereviewboard.ui.compareEditorInput";
 
     public ReviewboardDiffPart() {
-        
+
         setPartName("Diff");
     }
-    
-    private void addDescriptiveRow(String name, String value, FormToolkit toolkit,Composite composite) {
-        
+
+    private void addDescriptiveRow(String name, String value, FormToolkit toolkit,
+            Composite composite) {
+
         Label authorLabel = new Label(composite, SWT.NONE);
         authorLabel.setForeground(toolkit.getColors().getColor(IFormColors.TITLE));
         authorLabel.setText(name);
@@ -89,196 +93,265 @@ public class ReviewboardDiffPart extends AbstractTaskEditorPart {
         Label authorText = new Label(composite, SWT.NONE);
         authorText.setText(value);
     }
-    
+
     @Override
     public void createControl(Composite parent, FormToolkit toolkit) {
 
         Section section = createSection(parent, toolkit, true);
         Composite composite = toolkit.createComposite(section);
         GridLayoutFactory.createFrom(EditorUtil.createSectionClientLayout()).applyTo(composite);
-        
+
         final ReviewboardTaskMapper taskMapper = new ReviewboardTaskMapper(getTaskData());
-        
+
         final ReviewboardDiffMapper diffMapper = new ReviewboardDiffMapper(getTaskData());
-        
+
         ReviewModelFactory reviewModelFactory = new ReviewModelFactory(getClient());
-        
+
         Integer latestDiffRevisionId = diffMapper.getLatestDiffRevisionId();
-        
-        for ( final Integer diffRevision : diffMapper.getDiffRevisions() ) {
-            
-            int style = ExpandableComposite.TWISTIE | ExpandableComposite.CLIENT_INDENT | ExpandableComposite.LEFT_TEXT_CLIENT_ALIGNMENT;
-            
-            if ( diffRevision.equals(latestDiffRevisionId) )
+
+        for (final Integer diffRevision : diffMapper.getDiffRevisions()) {
+
+            int style = ExpandableComposite.TWISTIE | ExpandableComposite.CLIENT_INDENT
+                    | ExpandableComposite.LEFT_TEXT_CLIENT_ALIGNMENT;
+
+            if (diffRevision.equals(latestDiffRevisionId))
                 style |= ExpandableComposite.EXPANDED;
-            
-            createSubsection(toolkit, composite, taskMapper, diffMapper, reviewModelFactory, diffRevision, style);
+
+            createSubsection(toolkit, composite, taskMapper, diffMapper, reviewModelFactory,
+                    diffRevision, style);
         }
-        
+
         installExtensions(composite, taskMapper.getRepository(), diffMapper, null);
-        
+
         toolkit.paintBordersFor(composite);
         section.setClient(composite);
         setSection(toolkit, section);
     }
 
-    private void createSubsection(FormToolkit toolkit, Composite composite, final ReviewboardTaskMapper taskMapper, final ReviewboardDiffMapper diffMapper,
+    private void createSubsection(FormToolkit toolkit, Composite composite,
+            final ReviewboardTaskMapper taskMapper, final ReviewboardDiffMapper diffMapper,
             final ReviewModelFactory reviewModelFactory, final Integer diffRevision, int style) {
-        
+
         final Section subSection = toolkit.createSection(composite, style);
         GridDataFactory.fillDefaults().grab(true, false).applyTo(subSection);
         subSection.setText(NLS.bind("Revision {0}", diffRevision));
-        
+
         Composite subComposite = toolkit.createComposite(subSection);
-        GridLayoutFactory.createFrom(EditorUtil.createSectionClientLayout()).numColumns(2).applyTo(subComposite);
+        GridLayoutFactory.createFrom(EditorUtil.createSectionClientLayout()).numColumns(2).applyTo(
+                subComposite);
         GridDataFactory.fillDefaults().applyTo(subComposite);
         subSection.setClient(subComposite);
-        String changesText = Labels.commentsAndDrafts(diffMapper.getNumberOfPublicComments(diffRevision), diffMapper.getNumberOfDraftComments(diffRevision)); 
+        String changesText = Labels.commentsAndDrafts(
+                diffMapper.getNumberOfPublicComments(diffRevision),
+                diffMapper.getNumberOfDraftComments(diffRevision));
         addTextClient(toolkit, subSection, changesText);
-      
-        addDescriptiveRow("Author", reviewModelFactory.createUser(taskMapper.getReporter()).getDisplayName(), toolkit, subComposite);
+
+        addDescriptiveRow("Author",
+                reviewModelFactory.createUser(taskMapper.getReporter()).getDisplayName(), toolkit,
+                subComposite);
         addDescriptiveRow("Created", diffMapper.getTimestamp(diffRevision), toolkit, subComposite);
-        
-        TableViewer diffTableViewer = new TableViewer(subComposite, SWT.SINGLE | SWT.BORDER | SWT.V_SCROLL);
+
+        TableViewer diffTableViewer = new TableViewer(subComposite,
+                SWT.SINGLE | SWT.BORDER | SWT.V_SCROLL);
         diffTableViewer.setContentProvider(new ArrayContentProvider());
-        diffTableViewer.setLabelProvider(new DelegatingStyledCellLabelProvider(new ReviewboardFileDiffLabelProvider(diffMapper)));
-        
-        GridDataFactory.fillDefaults().span(2,1).grab(true, true).hint(500, SWT.DEFAULT).applyTo(diffTableViewer.getControl());
-        
-        final TopicAddedListener listener = new RefreshEditorTopicAddedListener(getTaskEditorPage());
-        
-        List<IFileItem> fileItems= reviewModelFactory.createFileItems(taskMapper.getReporter(), diffMapper, diffRevision);
+        diffTableViewer.setLabelProvider(new DelegatingStyledCellLabelProvider(
+                new ReviewboardFileDiffLabelProvider(diffMapper)));
+
+        GridDataFactory.fillDefaults().span(2, 1).grab(true, true).hint(500, SWT.DEFAULT).applyTo(
+                diffTableViewer.getControl());
+
+        final TopicAddedListener listener = new RefreshEditorTopicAddedListener(
+                getTaskEditorPage());
+
+        List<IFileItem> fileItems = reviewModelFactory.createFileItems(taskMapper.getReporter(),
+                diffMapper, diffRevision);
         diffTableViewer.setInput(fileItems.toArray(new IFileItem[fileItems.size()]));
-        
+
         diffTableViewer.addOpenListener(new IOpenListener() {
-            
+
             public void open(OpenEvent event) {
-                
+
                 IStructuredSelection selection = (IStructuredSelection) event.getSelection();
-                
+
                 IFileItem item = (IFileItem) selection.getFirstElement();
-                
-                if ( FileDiff.DEV_NULL.equals(item.getName()) ) {
-                    MessageDialog.openWarning(null, "Unable to open diff", "The diff for this file can not be generated as it has been deleted.");
+
+                if (FileDiff.DEV_NULL.equals(item.getName())) {
+                    MessageDialog.openWarning(null, "Unable to open diff",
+                            "The diff for this file can not be generated as it has been deleted.");
                     return;
                 }
-                
-                ReviewUi.setActiveReview(new ReviewboardReviewBehaviour(getTaskEditorPage().getTask(), item, diffRevision, getClient(), reviewModelFactory, listener));
-                
-                SCMFileContentsLocator baseLocator = getSCMFileContentsLocator(taskMapper, item.getBase());
-                if ( baseLocator == null ) {
-                    MessageDialog.openWarning(null, "Unable to load base file", "Unable to load base file contents since no plug-in was able to handle the repository " + taskMapper.getRepository());
+
+                ReviewUi.setActiveReview(
+                        new ReviewboardReviewBehaviour(getTaskEditorPage().getTask(), item,
+                                diffRevision, getClient(), reviewModelFactory, listener));
+
+                SCMFileContentsLocator baseLocator = getSCMFileContentsLocator(taskMapper,
+                        item.getBase());
+                if (baseLocator == null) {
+                    MessageDialog.openWarning(null, "Unable to load base file",
+                            "Unable to load base file contents since no plug-in was able to handle the repository "
+                                    + taskMapper.getRepository());
                     return;
                 }
-                SCMFileContentsLocator targetLocator = getSCMFileContentsLocator(taskMapper, item.getTarget());
-                if ( targetLocator == null ) {
-                    MessageDialog.openWarning(null, "Unable to load target file", "Unable to load target file contents since no plug-in was able to handle the repository " + taskMapper.getRepository() + " The patch from the server will be used instead.");
+                SCMFileContentsLocator targetLocator = getSCMFileContentsLocator(taskMapper,
+                        item.getTarget());
+                if (targetLocator == null) {
+                    MessageDialog.openWarning(null, "Unable to load target file",
+                            "Unable to load target file contents since no plug-in was able to handle the repository "
+                                    + taskMapper.getRepository()
+                                    + " The patch from the server will be used instead.");
                 }
-                
-                ReviewboardReviewBehaviour reviewBehaviour = new ReviewboardReviewBehaviour(getTaskEditorPage().getTask() , item, diffRevision, getClient(),reviewModelFactory, listener);
-                
-                CompareUI.openCompareEditor(new ReviewboardCompareEditorInput(item, reviewBehaviour, getTaskData(), baseLocator, targetLocator, diffRevision));
+
+                ReviewboardReviewBehaviour reviewBehaviour = new ReviewboardReviewBehaviour(
+                        getTaskEditorPage().getTask(), item, diffRevision, getClient(),
+                        reviewModelFactory, listener);
+
+                CompareUI.openCompareEditor(getCompareEditorInput(diffRevision, item, baseLocator,
+                        targetLocator, reviewBehaviour));
             }
-   
+
+            private CompareEditorInput getCompareEditorInput(final Integer diffRevision,
+                    IFileItem item, SCMFileContentsLocator baseLocator,
+                    SCMFileContentsLocator targetLocator,
+                    ReviewboardReviewBehaviour reviewBehaviour) {
+                IConfigurationElement[] configurationElements = Platform.getExtensionRegistry().getConfigurationElementsFor(
+                        EXTENSION_POINT_EDITOR_INPUT);
+                for (IConfigurationElement ce : configurationElements) {
+                    if (taskMapper.getRepository().getTool().getDisplayName().equals(
+                            ce.getAttribute("repositoryType"))) {
+                        try {
+                            final Object o = ce.createExecutableExtension("class");
+                            if (o instanceof ICompareEditorInputFactory) {
+                                ICompareEditorInputFactory factory = (ICompareEditorInputFactory) o;
+                                if (factory.isEnabled(taskMapper.getRepository())) {
+                                    return factory.createInput(item, reviewBehaviour, getTaskData(),
+                                            baseLocator, targetLocator, diffRevision);
+                                }
+                            }
+                        } catch (CoreException e) {
+                            // ignore silently
+                        }
+                    }
+                }
+                return new ReviewboardCompareEditorInput(item, reviewBehaviour, getTaskData(),
+                        baseLocator, targetLocator, diffRevision);
+            }
+
         });
-                
+
         installExtensions(subComposite, taskMapper.getRepository(), diffMapper, diffRevision);
     }
 
-    private void installExtensions(Composite composite, Repository codeRepository, ReviewboardDiffMapper diffMapper, Integer diffRevisionId) {
-        
-        IConfigurationElement[] configurationElements = Platform.getExtensionRegistry().getConfigurationElementsFor(EXTENSION_POINT_TASK_DIFF_ACTIONS);
-        
+    private void installExtensions(Composite composite, Repository codeRepository,
+            ReviewboardDiffMapper diffMapper, Integer diffRevisionId) {
+
+        IConfigurationElement[] configurationElements = Platform.getExtensionRegistry().getConfigurationElementsFor(
+                EXTENSION_POINT_TASK_DIFF_ACTIONS);
+
         int reviewRequestId = Integer.parseInt(getTaskData().getTaskId());
-        
-        Map<String, TaskDiffAction> taskDiffActions = new LinkedHashMap<String, TaskDiffAction>(configurationElements.length);
-        
-        for ( IConfigurationElement element : configurationElements ) {
+
+        Map<String, TaskDiffAction> taskDiffActions = new LinkedHashMap<String, TaskDiffAction>(
+                configurationElements.length);
+
+        for (IConfigurationElement element : configurationElements) {
             try {
-                final TaskDiffAction taskDiffAction = (TaskDiffAction) element.createExecutableExtension("class");
-                taskDiffAction.init(getTaskRepository(), reviewRequestId, codeRepository, diffMapper, diffRevisionId);
-                if ( !taskDiffAction.isEnabled() )
+                final TaskDiffAction taskDiffAction = (TaskDiffAction) element.createExecutableExtension(
+                        "class");
+                taskDiffAction.init(getTaskRepository(), reviewRequestId, codeRepository,
+                        diffMapper, diffRevisionId);
+                if (!taskDiffAction.isEnabled())
                     continue;
-                
+
                 String label = element.getAttribute("label");
-                
+
                 taskDiffActions.put(label, taskDiffAction);
             } catch (CoreException e) {
                 ReviewboardUiPlugin.getDefault().getLog().log(e.getStatus());
             }
         }
-        
-        if ( taskDiffActions.isEmpty() )
+
+        if (taskDiffActions.isEmpty())
             return;
-        
+
         Composite extensionsComposite = new Composite(composite, SWT.NONE);
         RowLayoutFactory.fillDefaults().type(SWT.HORIZONTAL).applyTo(extensionsComposite);
-        
-        for ( final Map.Entry<String, TaskDiffAction> taskDiffAction : taskDiffActions.entrySet() ) {
+
+        for (final Map.Entry<String, TaskDiffAction> taskDiffAction : taskDiffActions.entrySet()) {
 
             final String labelTest = taskDiffAction.getKey();
-            
+
             Button button = new Button(extensionsComposite, SWT.PUSH);
             button.setText(labelTest);
             button.addSelectionListener(new SelectionListener() {
-                
+
                 public void widgetSelected(SelectionEvent e) {
-                    
+
                     IStatus status;
                     try {
                         status = taskDiffAction.getValue().execute(new NullProgressMonitor());
                     } catch (Exception e1) {
-                        status = new Status(IStatus.ERROR, ReviewboardUiPlugin.PLUGIN_ID, "Internal error while executing action '" + labelTest+"' : " + e1.getMessage(), e1);
+                        status = new Status(IStatus.ERROR, ReviewboardUiPlugin.PLUGIN_ID,
+                                "Internal error while executing action '" + labelTest + "' : "
+                                        + e1.getMessage(),
+                                e1);
                         ReviewboardUiPlugin.getDefault().getLog().log(status);
                     }
-                    
-                    if ( !status.isOK() ) {
-                        
+
+                    if (!status.isOK()) {
+
                         int kind = MessageDialog.ERROR;
-                        if ( status.getSeverity() == IStatus.WARNING )
+                        if (status.getSeverity() == IStatus.WARNING)
                             kind = MessageDialog.WARNING;
-                        
-                        MessageDialog.open(kind, null, "Error performing action", status.getMessage(), SWT.SHEET);
+
+                        MessageDialog.open(kind, null, "Error performing action",
+                                status.getMessage(), SWT.SHEET);
                     }
-                    
-                    if ( status.getCode() == TaskDiffAction.STATUS_CODE_REFRESH_REVIEW_REQUEST )
-                        org.review_board.ereviewboard.ui.util.EditorUtil.refreshEditorPage(getTaskEditorPage());
+
+                    if (status.getCode() == TaskDiffAction.STATUS_CODE_REFRESH_REVIEW_REQUEST)
+                        org.review_board.ereviewboard.ui.util.EditorUtil.refreshEditorPage(
+                                getTaskEditorPage());
                 }
-                
+
                 public void widgetDefaultSelected(SelectionEvent e) {
-                    
+
                 }
             });
 
         }
-        
+
     }
 
     private TaskRepository getTaskRepository() {
-        
-        return TasksUi.getRepositoryManager().getRepository(ReviewboardCorePlugin.REPOSITORY_KIND, getTaskData().getRepositoryUrl());
-    }
-    
-    private ReviewboardClient getClient() {
-        
-        return ReviewboardCorePlugin.getDefault().getConnector().getClientManager().getClient(getTaskRepository());
-    }
-    
-    private SCMFileContentsLocator getSCMFileContentsLocator(ReviewboardTaskMapper taskMapper, IFileVersion fileRevision) {
-        
-        IConfigurationElement[] configurationElements = Platform.getExtensionRegistry().getConfigurationElementsFor(EXTENSION_POINT_SCM_FILE_CONTENTS_LOCATOR);
 
-        for ( IConfigurationElement element : configurationElements ) { 
+        return TasksUi.getRepositoryManager().getRepository(ReviewboardCorePlugin.REPOSITORY_KIND,
+                getTaskData().getRepositoryUrl());
+    }
+
+    private ReviewboardClient getClient() {
+
+        return ReviewboardCorePlugin.getDefault().getConnector().getClientManager().getClient(
+                getTaskRepository());
+    }
+
+    private SCMFileContentsLocator getSCMFileContentsLocator(ReviewboardTaskMapper taskMapper,
+            IFileVersion fileRevision) {
+
+        IConfigurationElement[] configurationElements = Platform.getExtensionRegistry().getConfigurationElementsFor(
+                EXTENSION_POINT_SCM_FILE_CONTENTS_LOCATOR);
+
+        for (IConfigurationElement element : configurationElements) {
             try {
-                SCMFileContentsLocator locator = (SCMFileContentsLocator) element.createExecutableExtension("class");
-                locator.init(taskMapper.getRepository(), fileRevision.getPath(), fileRevision.getDescription());
-                if ( locator.isEnabled() )
+                SCMFileContentsLocator locator = (SCMFileContentsLocator) element.createExecutableExtension(
+                        "class");
+                locator.init(taskMapper.getRepository(), fileRevision.getPath(),
+                        fileRevision.getDescription());
+                if (locator.isEnabled())
                     return locator;
             } catch (CoreException e) {
                 ReviewboardUiPlugin.getDefault().getLog().log(e.getStatus());
             }
         }
-        
+
         return null;
     }
 
