@@ -16,6 +16,9 @@
    <feature url="features/org.review_board.ereviewboard.cvs_0.13.3.jar" id="org.review_board.ereviewboard.cvs" version="0.13.3">
       <category name="eReviewBoard Integrations"/>
    </feature>
+   <feature url="features/org.review_board.ereviewboard.eclipseccase_0.13.3.jar" id="org.review_board.ereviewboard.eclipseccase" version="0.13.3">
+      <category name="eReviewBoard Integrations"/>
+   </feature>
    <category-def name="eReviewBoard" label="eReviewBoard"/>
    <category-def name="eReviewBoard Integrations" label="eReviewBoard Integrations"/>
 </site>
