@@ -5,4 +5,11 @@
      	<scmFileContentsLocator class="org.review_board.ereviewboard.ccase.core.internal.actions.CCaseSCMFileContentsLocator">
      </scmFileContentsLocator>
    </extension>
+   <extension
+         point="org.review_board.ereviewboard.ui.compareEditorInput">
+      <compareEditorInput
+            class="org.review_board.ereviewboard.ccase.ui.internal.ClearcaseCompareEditorInputFactory"
+            repositoryType="ClearCase">
+      </compareEditorInput>
+   </extension>
 </plugin>
